@@ -59,6 +59,9 @@ def convert_shader_graph_to_xml(material, root):
         'show_preview',
         'hide',
         'show_texture',
+
+        'bl_idname',
+        'bl_label',
         'bl_description',
         'bl_icon',
         'bl_static_type',
