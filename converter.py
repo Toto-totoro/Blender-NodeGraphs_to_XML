@@ -86,7 +86,7 @@ def convert_shader_graph_to_xml(material, root):
         # TODO: validate wether all needed node properties are exported
         # TODO: list of currently unsupported properties (details at end of file):
         """
-        color_mapping, image, image_user, sun_direction, object, mapping
+        color_mapping, image, image_user, object, mapping
         """
 
         for prop_name in node.bl_rna.properties.keys():
