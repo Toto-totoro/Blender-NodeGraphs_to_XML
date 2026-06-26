@@ -94,7 +94,7 @@ def convert_shader_graph_to_xml(material, root):
                 continue
             prop = getattr(node, prop_name)
 
-            # collection properties
+            # collection properties (inputs, outputs, internal_links)
             if isinstance(prop, bpy.types.bpy_prop_collection):
                 collection_element = ET.SubElement(node_element, "Property", name=prop_name, type=type(prop).__name__)
                 for item in prop.keys():
@@ -127,6 +127,12 @@ def convert_shader_graph_to_xml(material, root):
                     else:
                         item_element.set("value", str(getattr(prop, item, None)))
 
+            # vector properties (Vector)
+            elif isinstance(prop, mathutils.Vector):
+                vector_element = ET.SubElement(node_element, "Property", name=prop_name, type=type(prop).__name__)
+                for i, v in enumerate(prop):
+                    ET.SubElement(vector_element, "Value", data=str(v))
+
             else:
                 print(f"Unsupported property type for {prop_name} in node {node.name}: {type(prop)}")
 
@@ -157,7 +163,6 @@ Unsupported property type for color_mapping in node Magic Texture: <class 'bpy.t
 Unsupported property type for color_mapping in node Noise Texture: <class 'bpy.types.ColorMapping'>
 Unsupported property type for color_mapping in node Noise Texture.001: <class 'bpy.types.ColorMapping'>
 Unsupported property type for color_mapping in node Sky Texture: <class 'bpy.types.ColorMapping'>
-Unsupported property type for sun_direction in node Sky Texture: <class 'Vector'>
 Unsupported property type for color_mapping in node Voronoi Texture: <class 'bpy.types.ColorMapping'>
 Unsupported property type for color_mapping in node Wave Texture: <class 'bpy.types.ColorMapping'>
 Unsupported property type for object in node Texture Coordinate: <class 'NoneType'>
