@@ -16,6 +16,7 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 import bpy
+import mathutils
 from lxml import etree as ET
 
 def convert_materials_to_xml(materials: list) -> str:
@@ -85,7 +86,7 @@ def convert_shader_graph_to_xml(material, root):
         # TODO: validate wether all needed node properties are exported
         # TODO: list of currently unsupported properties (details at end of file):
         """
-        texture_mapping, color_mapping, image, image_user, sun_direction, object, mapping
+        color_mapping, image, image_user, sun_direction, object, mapping
         """
 
         for prop_name in node.bl_rna.properties.keys():
@@ -93,6 +94,7 @@ def convert_shader_graph_to_xml(material, root):
                 continue
             prop = getattr(node, prop_name)
 
+            # collection properties
             if isinstance(prop, bpy.types.bpy_prop_collection):
                 collection_element = ET.SubElement(node_element, "Property", name=prop_name, type=type(prop).__name__)
                 for item in prop.keys():
@@ -107,8 +109,23 @@ def convert_shader_graph_to_xml(material, root):
                         else:
                             item_element.set("value", str(item.default_value))
 
+            # standard type properties
             elif isinstance(prop, (str, int, float, bool)):
                 ET.SubElement(node_element, "Property", name=prop_name, type=type(prop).__name__, value=str(prop))
+
+            # texture mapping property
+            elif isinstance(prop, bpy.types.TexMapping):
+                texture_mapping_element = ET.SubElement(node_element, "Property", name=prop_name, type=type(prop).__name__)
+                for item, item_value in prop.bl_rna.properties.items():
+                    if item == 'rna_type':
+                        continue
+                    item_element = ET.SubElement(texture_mapping_element, "Item", name=str(item), type=type(item_value).__name__)
+                    
+                    if isinstance(item_value, bpy.types.FloatProperty):
+                        for v in getattr(prop, item, None):
+                            ET.SubElement(item_element, "Value", data=str(v))
+                    else:
+                        item_element.set("value", str(getattr(prop, item, None)))
 
             else:
                 print(f"Unsupported property type for {prop_name} in node {node.name}: {type(prop)}")
@@ -129,45 +146,21 @@ def convert_shader_graph_to_xml(material, root):
         )
 
 """
-Unsupported property type for texture_mapping in node Brick Texture: <class 'bpy.types.TexMapping'>
 Unsupported property type for color_mapping in node Brick Texture: <class 'bpy.types.ColorMapping'>
-
-Unsupported property type for texture_mapping in node Checker Texture: <class 'bpy.types.TexMapping'>
 Unsupported property type for color_mapping in node Checker Texture: <class 'bpy.types.ColorMapping'>
-
-Unsupported property type for texture_mapping in node Gradient Texture: <class 'bpy.types.TexMapping'>
 Unsupported property type for color_mapping in node Gradient Texture: <class 'bpy.types.ColorMapping'>
-
-Unsupported property type for texture_mapping in node Gabor Texture: <class 'bpy.types.TexMapping'>
 Unsupported property type for color_mapping in node Gabor Texture: <class 'bpy.types.ColorMapping'>
-
 Unsupported property type for image in node Image Texture: <class 'NoneType'>
-Unsupported property type for texture_mapping in node Image Texture: <class 'bpy.types.TexMapping'>
 Unsupported property type for color_mapping in node Image Texture: <class 'bpy.types.ColorMapping'>
 Unsupported property type for image_user in node Image Texture: <class 'bpy.types.ImageUser'>
-
-Unsupported property type for texture_mapping in node Magic Texture: <class 'bpy.types.TexMapping'>
 Unsupported property type for color_mapping in node Magic Texture: <class 'bpy.types.ColorMapping'>
-
-Unsupported property type for texture_mapping in node Noise Texture: <class 'bpy.types.TexMapping'>
 Unsupported property type for color_mapping in node Noise Texture: <class 'bpy.types.ColorMapping'>
-
-Unsupported property type for texture_mapping in node Noise Texture.001: <class 'bpy.types.TexMapping'>
 Unsupported property type for color_mapping in node Noise Texture.001: <class 'bpy.types.ColorMapping'>
-
-Unsupported property type for texture_mapping in node Sky Texture: <class 'bpy.types.TexMapping'>
 Unsupported property type for color_mapping in node Sky Texture: <class 'bpy.types.ColorMapping'>
 Unsupported property type for sun_direction in node Sky Texture: <class 'Vector'>
-
-Unsupported property type for texture_mapping in node Voronoi Texture: <class 'bpy.types.TexMapping'>
 Unsupported property type for color_mapping in node Voronoi Texture: <class 'bpy.types.ColorMapping'>
-
-Unsupported property type for texture_mapping in node Wave Texture: <class 'bpy.types.TexMapping'>
 Unsupported property type for color_mapping in node Wave Texture: <class 'bpy.types.ColorMapping'>
-
 Unsupported property type for object in node Texture Coordinate: <class 'NoneType'>
-
 Unsupported property type for mapping in node RGB Curves: <class 'bpy.types.CurveMapping'>
-
 Unsupported property type for mapping in node Float Curve: <class 'bpy.types.CurveMapping'>
 """
