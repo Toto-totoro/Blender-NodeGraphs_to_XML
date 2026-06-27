@@ -113,19 +113,25 @@ def convert_shader_graph_to_xml(material, root):
             elif isinstance(prop, (str, int, float, bool)):
                 ET.SubElement(node_element, "Property", name=prop_name, type=type(prop).__name__, value=str(prop))
 
-            # texture mapping property
-            elif isinstance(prop, bpy.types.TexMapping):
+            # mapping properties (TexMapping, ColorMapping)
+            # TODO: ColorMapping has item ColorRamp, which is a collection (of ColorRampElements); needs special handling, not imlemented yet
+            #! Not Sure if these are even needed lol
+            elif isinstance(prop, bpy.types.TexMapping) or isinstance(prop, bpy.types.ColorMapping):
                 texture_mapping_element = ET.SubElement(node_element, "Property", name=prop_name, type=type(prop).__name__)
                 for item, item_value in prop.bl_rna.properties.items():
                     if item == 'rna_type':
                         continue
+                    item_value = getattr(prop, item, None)
                     item_element = ET.SubElement(texture_mapping_element, "Item", name=str(item), type=type(item_value).__name__)
-                    
-                    if isinstance(item_value, bpy.types.FloatProperty):
-                        for v in getattr(prop, item, None):
+
+                    if isinstance(item_value, mathutils.Vector) or isinstance(item_value, mathutils.Euler) or isinstance(item_value, mathutils.Color):
+                        for v in item_value:
                             ET.SubElement(item_element, "Value", data=str(v))
+                        if isinstance(item_value, mathutils.Euler):
+                            ET.SubElement(item_element, "Value", data=str(item_value.order))
+                            
                     else:
-                        item_element.set("value", str(getattr(prop, item, None)))
+                        item_element.set("value", str(item_value))
 
             # vector properties (Vector)
             elif isinstance(prop, mathutils.Vector):
