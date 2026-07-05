@@ -17,12 +17,13 @@
 
 import bpy
 import mathutils
+import hashlib
 import traceback
 from lxml import etree as ET
 
 def convert_nodegroups_to_xml(nodegroups: list) -> str:
     # root element
-    root = ET.Element("NodeGroups")
+    root = ET.Element("BlenderNodeGraphs")
 
     for nodegroup in nodegroups:
         convert_nodegroup_to_xml(nodegroup, root)
@@ -30,27 +31,27 @@ def convert_nodegroups_to_xml(nodegroups: list) -> str:
     return ET.tostring(root, pretty_print=True).decode()
 
 def convert_nodegroup_to_xml(nodegroup, root):
-    nodegroup_element = ET.SubElement(root, "NodeGroup", name=nodegroup.name)
+    nodegroup_element = ET.SubElement(root, "Graph", name=nodegroup.name)
 
     # TODO: node groups should get replaced by their contents. They can be identified by their bl_idname "ShaderNodeGroup" and accessed via bpy.data.node_groups.
     # TODO: check if output format is optimal for info retrieval
 
-    # Iterate through the nodes in the node group's node tree
+    # Iterate through the nodes in the node group
     for node in nodegroup.nodes:
-        node_element = ET.SubElement(nodegroup_element, "Node", type=node.bl_idname, name=node.name)
-
-        # Add properties of the node as sub-elements
-
-        """
-        Replaced property selection by filtering out, since many nodes have special properties
-        and unneccesary ones are shared by most (if not all)
-        """
-        # property_selection = {
-        #     'type', 'inputs', 'outputs', 'internal_links', 'node_tree'
-        # }
         
+        # check for node groups and convert them recursively
+        if node.bl_idname == "ShaderNodeGroup" or node.bl_idname == "GeometryNodeGroup":
+            if node.node_tree is not None:
+                convert_nodegroup_to_xml(node.node_tree, nodegroup_element)
+            else:
+                print(f"Node group {node.name} has no node tree assigned.")
+            continue  # Skip the rest for node groups
+            
 
 
+        node_element = ET.SubElement(nodegroup_element, "Node", name=node.name, type=node.bl_idname)
+
+        # mostly properties regarding graphical representation in blender
         filter_unnecessary = {
         'width',
         'height',
@@ -85,10 +86,6 @@ def convert_nodegroup_to_xml(nodegroup, root):
 
 
         # TODO: validate wether all needed node properties are exported
-        # TODO: list of currently unsupported properties (details at end of file):
-        """
-        color_mapping, image, image_user, object, mapping
-        """
 
         for prop_name in node.bl_rna.properties.keys():
             if prop_name in filter_unnecessary:  # filter out unnecessary properties
@@ -101,13 +98,13 @@ def convert_nodegroup_to_xml(nodegroup, root):
 
             # standard type properties
             elif isinstance(prop, (str, int, float, bool)):
-                ET.SubElement(node_element, "Property", name=prop_name, type=type(prop).__name__, value=str(prop))
+                ET.SubElement(node_element, "Constant", name=prop_name, value=str(prop))
 
             # mapping properties (TexMapping, ColorMapping)
             # TODO: ColorMapping has item ColorRamp, which is a collection (of ColorRampElements); needs special handling, not imlemented yet
             #! Not Sure if these are even needed lol
             elif isinstance(prop, bpy.types.TexMapping) or isinstance(prop, bpy.types.ColorMapping):
-                texture_mapping_element = ET.SubElement(node_element, "Property", name=prop_name, type=type(prop).__name__)
+                texture_mapping_element = ET.SubElement(node_element, "Constant", name=prop_name)
                 for item, item_value in prop.bl_rna.properties.items():
                     if item == 'rna_type':
                         continue
@@ -134,16 +131,16 @@ def convert_nodegroup_to_xml(nodegroup, root):
     # Store node links
     # Format: <Link from_node="NodeA" from_socket="Output" to_node="NodeB" to_socket="Input"/>
     # Socket is the connection point (variable) from the graph
-    links_element = ET.SubElement(nodegroup_element, "Links")
+    
     for link in nodegroup.links:
-        ET.SubElement(
-            links_element,
-            "Link",
-            from_node=link.from_node.name,
-            from_socket=link.from_socket.name,
-            to_node=link.to_node.name,
-            to_socket=link.to_socket.name,
+        from_id = port_id_hash(link.from_node.name, link.from_socket.name)
+        to_id = port_id_hash(link.to_node.name, link.to_socket.name)
+        connection_element = ET.SubElement(
+            nodegroup_element,
+            "Connection"
         )
+        connection_element.set("from", from_id)
+        connection_element.set("to", to_id)
 
 
 
@@ -172,18 +169,37 @@ def convert_mathutils_euler_to_xml(prop, prop_name, parent_element):
 
 def convert_bpy_collection_to_xml(prop, prop_name, parent_element):
     try:
-        collection_element = ET.SubElement(parent_element, "Property", name=prop_name, type=type(prop).__name__)
         for item in prop.keys():
             if prop.get(item) is None:
                 continue
             item = prop.get(item)
-            item_element = ET.SubElement(collection_element, "Item", name=item.name, type=type(item).__name__)
-            if hasattr(item, 'default_value'):
-                if isinstance(item.default_value, bpy.types.bpy_prop_array):
-                    for v in item.default_value:
-                        ET.SubElement(item_element, "Value", data=str(v))
-                else:
-                    item_element.set("value", str(item.default_value))
+
+            if item.is_linked:
+                item_element = ET.SubElement(parent_element, "Port", name=item.name, direction="out" if item.is_output else "in", id=port_id_hash(parent_element.get("name"), item.name))
+            else:
+                if item.is_output:
+                    continue  # Skip unlinked output items
+                if hasattr(item, 'default_value'):
+                    if isinstance(item.default_value, bpy.types.bpy_prop_array):
+                        item_element = ET.SubElement(parent_element, "Port", name="vectorIn", direction="in", id=port_id_hash(parent_element.get("name"), "vectorIn"))
+                        extracted_vec_element = ET.SubElement(parent_element.getparent(), "Node", name=item.name, type=str(getattr(item, 'type', None)))
+                        vec_coordinate_names = ['x', 'y', 'z']
+                        for i in range(3):
+                            ET.SubElement(extracted_vec_element, "Constant", name=vec_coordinate_names[i], value=str(item.default_value[i]))
+                        extracted_vec_element_outsocket = ET.SubElement(extracted_vec_element, "Port", name="vectorOut", direction="out", id=port_id_hash(parent_element.get("name"), "vectorOut"))
+
+                        ET.SubElement(parent_element.getparent(), "Connection", from_=extracted_vec_element_outsocket.get("id"), to=item_element.get("id"))
+                    else:
+                        item_element = ET.SubElement(parent_element, "Constant", name=item.name, value=str(item.default_value))
+
     except Exception as e:
         print(f"{prop_name}: {type(prop)} | is not a bpy.types.bpy_prop_collection")
         traceback.print_exc()
+
+
+##################
+# Helper Methods #
+##################
+
+def port_id_hash(parent_name, item_name):
+    return hashlib.sha1(f'{parent_name}{item_name}'.encode()).hexdigest()
