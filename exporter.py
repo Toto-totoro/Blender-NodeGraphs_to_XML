@@ -19,17 +19,17 @@ import bpy
 from bpy_extras.io_utils import ExportHelper
 from bpy.props import StringProperty, BoolProperty
 from bpy.types import Operator
-from .converter import convert_materials_to_xml
+from .geometry_converter import convert_node_groups_to_xml
 
-# UI and logic for selecting materials to export
+# UI and logic for selecting node groups to export
 class ExportShaderGraph(bpy.types.Operator):
-    bl_idname = "export.shadergraph"
-    bl_label = "Export ShaderGraph"
+    bl_idname = "export.geometrynodegroups"
+    bl_label = "Export Geometry Node Groups"
 
     select_all: BoolProperty(
         name="Select Everything",
         default=False,
-        description="Toggle all materials for export",
+        description="Toggle all node groups for export",
     )
 
     old_select_all: BoolProperty(
@@ -42,11 +42,11 @@ class ExportShaderGraph(bpy.types.Operator):
         layout = self.layout
         layout.prop(self, "select_all")
         layout.separator()
-        layout.label(text="Select Material to Export:")
+        layout.label(text="Select Node Group to Export:")
 
         box = layout.box()
 
-        for item in context.blend_data.materials:
+        for item in context.blend_data.node_groups:
             row = box.row()
             row.prop(item, "export", text=item.name)
 
@@ -60,33 +60,33 @@ class ExportShaderGraph(bpy.types.Operator):
     # Checks and updates the list of materials to export when the "Select Everything" checkbox is toggled
     def check(self, context):
         if self.select_all != self.old_select_all:
-            for item in context.blend_data.materials:
+            for item in context.blend_data.node_groups:
                 item.export = self.select_all
             self.old_select_all = self.select_all    
             return True
         return True
 
-    # Checks if materials are selected for export and if so, opens the file dialog for exporting the shader graph to XML
+    # Checks if node groups are selected for export and if so, opens the file dialog for exporting the geometry node groups to XML
     def execute(self, context):
-        materials_to_export = any(item.export for item in bpy.data.materials)
-        if not materials_to_export:
-            self.report({'ERROR'}, "No material selected for export.")
+        node_groups_to_export = any(item.export for item in bpy.data.node_groups)
+        if not node_groups_to_export:
+            self.report({'ERROR'}, "No node group selected for export.")
             return {'CANCELLED'}
 
         bpy.ops.export.shadergraph_2('INVOKE_DEFAULT')
         return {'FINISHED'}
 
-# UI and logic for exporting the selected materials to XML
+# UI and logic for exporting the selected node groups to XML
 class ExportShaderGraph2(bpy.types.Operator, ExportHelper):
-    bl_idname = "export.shadergraph_2"
-    bl_label = "Export ShaderGraph"
+    bl_idname = "export.nodegraphs"
+    bl_label = "Export Node Graphs"
     filename_ext = ".xml"
 
-    # Executes the export process for the selected materials
+    # Executes the export process for the selected node groups
     def execute(self, context):
         target_filepath = self.filepath
-        materials_to_export = [item for item in bpy.data.materials if item.export]
-        xml_string = convert_materials_to_xml(materials_to_export)
+        node_groups_to_export = [item for item in bpy.data.node_groups if item.export]
+        xml_string = convert_node_groups_to_xml(node_groups_to_export)
 
         # Generates XML file, stores XML string into generated file,saves it in specified location
         with open(target_filepath, 'w', encoding='utf-8') as file:

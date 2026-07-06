@@ -21,12 +21,12 @@ import hashlib
 import traceback
 from lxml import etree as ET
 
-def convert_nodegroups_to_xml(nodegroups: list) -> str:
+def convert_node_groups_to_xml(node_groups: list) -> str:
     # root element
     root = ET.Element("BlenderNodeGraphs")
 
-    for nodegroup in nodegroups:
-        convert_nodegroup_to_xml(nodegroup, root)
+    for node_group in node_groups:
+        convert_nodegroup_to_xml(node_group, root)
 
     return ET.tostring(root, pretty_print=True).decode()
 
