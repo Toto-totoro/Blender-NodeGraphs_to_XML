@@ -22,7 +22,7 @@ from . import exporter
 
 
 def menu_export_button(self, context):
-    self.layout.operator(exporter.ExportShaderGraph.bl_idname, text="ShaderGraph (.xml)")
+    self.layout.operator(exporter.ExportNodeGraph.bl_idname, text="Node Graph (.xml)")
 
 def register():
     bpy.types.TOPBAR_MT_file_export.append(menu_export_button)

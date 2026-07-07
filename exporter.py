@@ -22,7 +22,7 @@ from bpy.types import Operator
 from .geometry_converter import convert_node_groups_to_xml
 
 # UI and logic for selecting node groups to export
-class ExportShaderGraph(bpy.types.Operator):
+class ExportNodeGraph(bpy.types.Operator):
     bl_idname = "export.geometrynodegroups"
     bl_label = "Export Geometry Node Groups"
 
@@ -73,11 +73,11 @@ class ExportShaderGraph(bpy.types.Operator):
             self.report({'ERROR'}, "No node group selected for export.")
             return {'CANCELLED'}
 
-        bpy.ops.export.shadergraph_2('INVOKE_DEFAULT')
+        bpy.ops.export.nodegraphs('INVOKE_DEFAULT')
         return {'FINISHED'}
 
 # UI and logic for exporting the selected node groups to XML
-class ExportShaderGraph2(bpy.types.Operator, ExportHelper):
+class ExportNodeGraph2(bpy.types.Operator, ExportHelper):
     bl_idname = "export.nodegraphs"
     bl_label = "Export Node Graphs"
     filename_ext = ".xml"
@@ -95,12 +95,12 @@ class ExportShaderGraph2(bpy.types.Operator, ExportHelper):
         return {'FINISHED'}
         
 def register():
-    bpy.types.Material.export = BoolProperty(name="", default=False)
-    bpy.utils.register_class(ExportShaderGraph)
-    bpy.utils.register_class(ExportShaderGraph2)
+    bpy.types.GeometryNodeTree.export = BoolProperty(name="", default=False)
+    bpy.utils.register_class(ExportNodeGraph)
+    bpy.utils.register_class(ExportNodeGraph2)
 
 
 def unregister():
-    bpy.utils.unregister_class(ExportShaderGraph2)
-    bpy.utils.unregister_class(ExportShaderGraph)
-    del bpy.types.Material.export
+    bpy.utils.unregister_class(ExportNodeGraph2)
+    bpy.utils.unregister_class(ExportNodeGraph)
+    del bpy.types.GeometryNodeTree.export
