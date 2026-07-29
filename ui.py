@@ -1,4 +1,4 @@
-# Blender ShaderGraph_to_XML
+# Blender NodeGraphs_to_XML
 # Contributor(s): Tom Schäfer (tschaefer.acc@gmail.com) and Laurin von Bergmann
 #
 # Template "Blender Add-on Template" by: Aaron Powell (aaron@lunadigital.tv)
@@ -22,7 +22,7 @@ from . import exporter
 
 
 def menu_export_button(self, context):
-    self.layout.operator(exporter.ExportShaderGraph.bl_idname, text="ShaderGraph (.xml)")
+    self.layout.operator(exporter.ExportNodeGraph.bl_idname, text="Node Graph (.xml)")
 
 def register():
     bpy.types.TOPBAR_MT_file_export.append(menu_export_button)

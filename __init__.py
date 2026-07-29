@@ -1,4 +1,4 @@
-# Blender ShaderGraph_to_XML
+# Blender NodeGraphs_to_XML
 # Contributor(s): Tom Schäfer (tschaefer.acc@gmail.com) and Laurin von Bergmann
 #
 # Template "Blender Add-on Template" by: Aaron Powell (aaron@lunadigital.tv)
@@ -17,36 +17,28 @@
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
 bl_info = {
-        "name": "Shader_to_XML",
-        "description": "Exports a material's shader-graph into a serialized graph in XML.",
+        "name": "NodeGraphs_to_XML",
+        "description": "Exports a node-graph (material or nodegroup) into a serialized graph in XML.",
         "author": "Tom Schäfer, Laurin von Bergmann",
         "version": (1, 0),
         "blender": (5, 1, 2),
-        "location": "File > Export > Shader Graph as XML",
+        "location": "File > Export > Node Graph as XML",
         "warning": "", # used for warning icon and text in add-ons panel
-        "wiki_url": "https://github.com/Toto-totoro/Blender-ShaderGraph_to_XML/wiki",
-        "tracker_url": "https://github.com/Toto-totoro/Blender-ShaderGraph_to_XML/issues",
+        "wiki_url": "https://github.com/Toto-totoro/Blender-NodeGraphs_to_XML/wiki",
+        "tracker_url": "https://github.com/Toto-totoro/Blender-NodeGraphs_to_XML/issues",
         "support": "COMMUNITY",
         "category": "Export"
         }
 
 import bpy
 
-#
-# Add additional functions here
-#
-
 def register():
-    # from . import properties
-    # properties.register()
     from . import ui
     from . import exporter
     exporter.register()
     ui.register()
 
 def unregister():
-    # from . import properties
-    # properties.unregister()
     from . import ui
     from . import exporter
     exporter.unregister()
