@@ -1,4 +1,4 @@
-# Blender ShaderGraph_to_XML
+# Blender NodeGraphs_to_XML
 # Contributor(s): Tom Schäfer (tschaefer.acc@gmail.com) and Laurin von Bergmann
 #
 # This program is free software; you can redistribute it and/or modify
@@ -22,7 +22,7 @@ from bpy.types import Operator
 from .geometry_converter import convert_node_groups_to_xml
 
 # UI and logic for selecting node groups to export
-class ExportNodeGraph(bpy.types.Operator):
+class ExportSelector(bpy.types.Operator):
     bl_idname = "export.geometrynodegroups"
     bl_label = "Export Geometry Node Groups"
 
@@ -77,7 +77,7 @@ class ExportNodeGraph(bpy.types.Operator):
         return {'FINISHED'}
 
 # UI and logic for exporting the selected node groups to XML
-class ExportNodeGraph2(bpy.types.Operator, ExportHelper):
+class ExportExecutor(bpy.types.Operator, ExportHelper):
     bl_idname = "export.nodegraphs"
     bl_label = "Export Node Graphs"
     filename_ext = ".xml"
@@ -96,11 +96,11 @@ class ExportNodeGraph2(bpy.types.Operator, ExportHelper):
         
 def register():
     bpy.types.GeometryNodeTree.export = BoolProperty(name="", default=False)
-    bpy.utils.register_class(ExportNodeGraph)
-    bpy.utils.register_class(ExportNodeGraph2)
+    bpy.utils.register_class(ExportSelector)
+    bpy.utils.register_class(ExportExecutor)
 
 
 def unregister():
-    bpy.utils.unregister_class(ExportNodeGraph2)
-    bpy.utils.unregister_class(ExportNodeGraph)
+    bpy.utils.unregister_class(ExportExecutor)
+    bpy.utils.unregister_class(ExportSelector)
     del bpy.types.GeometryNodeTree.export

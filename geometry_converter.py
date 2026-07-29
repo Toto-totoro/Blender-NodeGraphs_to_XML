@@ -1,4 +1,4 @@
-# Blender ShaderGraph_to_XML
+# Blender NodeGraphs_to_XML
 # Contributor(s): Tom Schäfer (tschaefer.acc@gmail.com) and Laurin von Bergmann
 #
 #
