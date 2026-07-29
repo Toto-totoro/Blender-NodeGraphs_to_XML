@@ -33,7 +33,6 @@ def convert_node_groups_to_xml(node_groups: list) -> str:
 def convert_nodegroup_to_xml(nodegroup, root):
     nodegroup_element = ET.SubElement(root, "Graph", name=nodegroup.name)
 
-    # TODO: node groups should get replaced by their contents. They can be identified by their bl_idname "ShaderNodeGroup" and accessed via bpy.data.node_groups.
     # TODO: check if output format is optimal for info retrieval
 
     # Iterate through the nodes in the node group
@@ -52,6 +51,7 @@ def convert_nodegroup_to_xml(nodegroup, root):
         node_element = ET.SubElement(nodegroup_element, "Node", name=node.name, type=node.bl_idname)
 
         # mostly properties regarding graphical representation in blender
+        # TODO: validate wether all needed node properties are exported
         filter_unnecessary = {
         'type',
         'name',
@@ -86,12 +86,15 @@ def convert_nodegroup_to_xml(nodegroup, root):
         'location',
         'location_absolute',
         'dimensions',
-        'parent', #TODO might be useful, don't know, investigate
-        'color'
+        'parent', # TODO: might be useful, don't know, investigate
+        'color',
+
+        # TODO: verify if these are needed
+        'texture_mapping',
+        'color_mapping'
         }
 
 
-        # TODO: validate wether all needed node properties are exported
 
         for prop_name in node.bl_rna.properties.keys():
             if prop_name in filter_unnecessary:  # filter out unnecessary properties
@@ -107,24 +110,9 @@ def convert_nodegroup_to_xml(nodegroup, root):
                 ET.SubElement(node_element, "Constant", name=prop_name, value=str(prop))
 
             # mapping properties (TexMapping, ColorMapping)
-            # TODO: ColorMapping has item ColorRamp, which is a collection (of ColorRampElements); needs special handling, not imlemented yet
             #! Not Sure if these are even needed lol
-            elif isinstance(prop, bpy.types.TexMapping) or isinstance(prop, bpy.types.ColorMapping):
-                texture_mapping_element = ET.SubElement(node_element, "Constant", name=prop_name)
-                for item, item_value in prop.bl_rna.properties.items():
-                    if item == 'rna_type':
-                        continue
-                    item_value = getattr(prop, item, None)
-                    item_element = ET.SubElement(texture_mapping_element, "Item", name=str(item), type=type(item_value).__name__)
-
-                    if isinstance(item_value, mathutils.Vector) or isinstance(item_value, mathutils.Euler) or isinstance(item_value, mathutils.Color):
-                        for v in item_value:
-                            ET.SubElement(item_element, "Value", data=str(v))
-                        if isinstance(item_value, mathutils.Euler):
-                            ET.SubElement(item_element, "Value", data=str(item_value.order))
-                            
-                    else:
-                        item_element.set("value", str(item_value))
+            # elif isinstance(prop, bpy.types.TexMapping) or isinstance(prop, bpy.types.ColorMapping):
+            #    convert_bpy_mapping_to_xml(prop, prop_name, node_element)
 
             # vector properties (Vector)
             elif isinstance(prop, mathutils.Vector):
@@ -202,10 +190,27 @@ def convert_bpy_collection_to_xml(prop, prop_name, parent_element):
         print(f"{prop_name}: {type(prop)} | is not a bpy.types.bpy_prop_collection")
         traceback.print_exc()
 
+# TODO: ColorMapping has item ColorRamp, which is a collection (of ColorRampElements); needs special handling, not imlemented yet
+def convert_bpy_mapping_to_xml(prop, prop_name, parent_element):
+    texture_mapping_element = ET.SubElement(parent_element, "Constant", name=prop_name)
+    for item, item_value in prop.bl_rna.properties.items():
+        if item == 'rna_type':
+            continue
+        item_value = getattr(prop, item, None)
+        item_element = ET.SubElement(texture_mapping_element, "Item", name=str(item), type=type(item_value).__name__)
+        if isinstance(item_value, mathutils.Vector) or isinstance(item_value, mathutils.Euler) or isinstance(item_value, mathutils.Color):
+            for v in item_value:
+                ET.SubElement(item_element, "Value", data=str(v))
+            if isinstance(item_value, mathutils.Euler):
+                ET.SubElement(item_element, "Value", data=str(item_value.order))
+                
+        else:
+            item_element.set("value", str(item_value))
 
-##################
-# Helper Methods #
-##################
+
+########################
+# Other Helper Methods #
+########################
 
 def port_id_hash(parent_name, item_pointer):
     return hashlib.sha1(f'{parent_name}{item_pointer}'.encode()).hexdigest()
