@@ -1,7 +1,8 @@
 # Blender-NodeGraphs_to_XML
 Blender Addon to export node-groups and materials aka geometry/shader node graphs into a serialized graph in xml
 
-> [!WARNING] Currently only node-groups are supported, materials are being worked on.
+> [!WARNING]
+> Currently only node-groups are supported, materials are being worked on.
 
 # Installation
 1. Install the lxml python module to your blender modules (todo: quick tutorial here)
