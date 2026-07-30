@@ -4,7 +4,7 @@ Blender Addon to export node-groups and materials aka geometry/shader node graph
 > [!NOTE]
 > This plugin is made primarily for exporting (geometry) node-groups. \
 > Therefore the functions for materials and node-groups are currently semi-duplicate split into 2 converter files \
-> to accomodate for future tweaks to the material conversion functionality \
+> to accomodate for future tweaks to the material conversion functionality
 
 # Installation
 1. Install the lxml python module to your blender modules (todo: quick tutorial here)
