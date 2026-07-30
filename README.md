@@ -1,7 +1,7 @@
 # Blender-NodeGraphs_to_XML
 Blender Addon to export node-groups and materials aka geometry/shader node graphs into a serialized graph in xml
 
-> ![NOTE]
+> [!NOTE]
 > This plugin is made primarily for exporting (geometry) node-groups.
 > Therefore the functions for materials and node-groups are currently semi-duplicate split into 2 converter files
 > to accomodate for future tweaks to the material conversion functionality
