@@ -21,11 +21,16 @@ from bpy.types import Operator
 from . import exporter
 
 
-def menu_export_button(self, context):
-    self.layout.operator(exporter.ExportNodeGraph.bl_idname, text="Node Graph (.xml)")
+def menu_export_nodegraph_button(self, context):
+    self.layout.operator(exporter.ExportNodeGroupsSelector.bl_idname, text="Node Groups (.xml)")
+
+def menu_export_shadergraph_button(self, context):
+    self.layout.operator(exporter.ExportMaterialsSelector.bl_idname, text="Shader Materials (.xml)")
 
 def register():
-    bpy.types.TOPBAR_MT_file_export.append(menu_export_button)
+    bpy.types.TOPBAR_MT_file_export.append(menu_export_nodegraph_button)
+    bpy.types.TOPBAR_MT_file_export.append(menu_export_shadergraph_button)
 
 def unregister():
-    bpy.types.TOPBAR_MT_file_export.remove(menu_export_button)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_export_nodegraph_button)
+    bpy.types.TOPBAR_MT_file_export.remove(menu_export_shadergraph_button)
