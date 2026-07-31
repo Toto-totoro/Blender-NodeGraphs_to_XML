@@ -1,8 +1,6 @@
 # Blender NodeGraphs_to_XML
 # Contributor(s): Tom Schäfer (tschaefer.acc@gmail.com) and Laurin von Bergmann
 #
-# Template "Blender Add-on Template" by: Aaron Powell (aaron@lunadigital.tv)
-#
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
