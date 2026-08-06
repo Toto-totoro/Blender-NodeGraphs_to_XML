@@ -39,92 +39,70 @@ def convert_nodegroup_to_xml(nodegroup, root):
     for node in nodegroup.nodes:
         
         # check for node groups and convert them recursively
-        if node.bl_idname == "ShaderNodeGroup" or node.bl_idname == "GeometryNodeGroup":
+        is_nodegroup = node.bl_idname == "ShaderNodeGroup" or node.bl_idname == "GeometryNodeGroup"
+        if is_nodegroup:
             if node.node_tree is not None:
+                convert_nodegroup_node_to_xml(node, nodegroup_element)
                 convert_nodegroup_to_xml(node.node_tree, nodegroup_element)
             else:
                 print(f"Node group {node.name} has no node tree assigned.")
-            continue  # Skip the rest for node groups
             
 
 
         node_element = ET.SubElement(nodegroup_element, "Node", name=node.name, type=node.bl_idname)
-
         # mostly properties regarding graphical representation in blender
         # TODO: validate wether all needed node properties are exported
         filter_unnecessary = {
-        'type',
-        'name',
-        'label',
+                'type',
+                'name',
+                'label',
+                
+                'width',
+                'height',
+                'use_custom_color',
+                'color_tag',
+                'select',
+                'show_options',
+                'show_preview',
+                'hide',
+                'show_texture',
+                'internal_links',
+                'warning_propagation',
         
-        'width',
-        'height',
-        'use_custom_color',
-        'color_tag',
-        'select',
-        'show_options',
-        'show_preview',
-        'hide',
-        'show_texture',
-        'internal_links',
-        'warning_propagation',
-
-        'bl_idname',
-        'bl_label',
-        'bl_description',
-        'bl_icon',
-        'bl_static_type',
-        'bl_width_default',
-        'bl_width_min',
-        'bl_width_max',
-        'bl_height_default',
-        'bl_height_min',
-        'bl_height_max',
-
-        # these are currently filtered out by isinstance checking anyway lol
-        'rna_type',
-        'location',
-        'location_absolute',
-        'dimensions',
-        'parent', # TODO: might be useful, don't know, investigate
-        'color',
-
-        # TODO: verify if these are needed
-        'texture_mapping',
-        'color_mapping'
-        }
+                'bl_idname',
+                'bl_label',
+                'bl_description',
+                'bl_icon',
+                'bl_static_type',
+                'bl_width_default',
+                'bl_width_min',
+                'bl_width_max',
+                'bl_height_default',
+                'bl_height_min',
+                'bl_height_max',
+        
+                # these are currently filtered out by isinstance checking anyway lol
+                'rna_type',
+                'location',
+                'location_absolute',
+                'dimensions',
+                'parent', # TODO: might be useful, don't know, investigate
+                'color',
+        
+                # TODO: verify if these are needed
+                'texture_mapping',
+                'color_mapping',
+        
+                'node_tree' #handled elsewhere
+                }
+        convert_node_properties_to_xml(node, node_element, filter_unnecessary)
 
 
-
-        for prop_name in node.bl_rna.properties.keys():
-            if prop_name in filter_unnecessary:  # filter out unnecessary properties
-                continue
-            prop = getattr(node, prop_name)
-
-            # collection properties (inputs, outputs)
-            if isinstance(prop, bpy.types.bpy_prop_collection):
-                convert_bpy_collection_to_xml(prop, prop_name, node_element)
-
-            # standard type properties
-            elif isinstance(prop, (str, int, float, bool)):
-                ET.SubElement(node_element, "Constant", name=prop_name, value=str(prop))
-
-            # mapping properties (TexMapping, ColorMapping)
-            #! Not Sure if these are even needed lol
-            # elif isinstance(prop, bpy.types.TexMapping) or isinstance(prop, bpy.types.ColorMapping):
-            #    convert_bpy_mapping_to_xml(prop, prop_name, node_element)
-
-            # vector properties (Vector)
-            elif isinstance(prop, mathutils.Vector):
-                convert_mathutils_vector_to_xml(prop, prop_name, node_element)
-
-            else:
-                print(f"Unsupported property type for {prop_name} in node {node.name}: {type(prop)}")
 
     # TODO: sort links in graph order
     # Store node links
-    # Format: <Link from_node="NodeA" from_socket="Output" to_node="NodeB" to_socket="Input"/>
-    # Socket is the connection point (variable) from the graph
+    # Format: <Connection from='hash_id' to='hash_id' />
+    # hash = sha1 of (per graph unique) node name and pointer
     
     for link in nodegroup.links:
         from_id = port_id_hash(link.from_node.name, link.from_socket.as_pointer())
@@ -142,70 +120,172 @@ def convert_nodegroup_to_xml(nodegroup, root):
 # Conversion Helpers for different property types #
 ###################################################
 
-def convert_mathutils_vector_to_xml(prop, prop_name, parent_element):
+def convert_nodegroup_node_to_xml(node, parent_element):
+    #1. split nodegroup node in 2
+    input_node_element = ET.SubElement(parent_element, "Node", name=node.name+'in', type=node.bl_idname)
+    output_node_element = ET.SubElement(parent_element, "Node", name=node.name+'out', type=node.bl_idname)
+
+    #2. Input Node: route input
+    filter_for_input_node = {
+                    'type',
+                    'name',
+                    'label',
+                    
+                    'width',
+                    'height',
+                    'use_custom_color',
+                    'color_tag',
+                    'select',
+                    'show_options',
+                    'show_preview',
+                    'hide',
+                    'show_texture',
+                    'internal_links',
+                    'warning_propagation',
+            
+                    'bl_idname',
+                    'bl_label',
+                    'bl_description',
+                    'bl_icon',
+                    'bl_static_type',
+                    'bl_width_default',
+                    'bl_width_min',
+                    'bl_width_max',
+                    'bl_height_default',
+                    'bl_height_min',
+                    'bl_height_max',
+            
+                    'rna_type',
+                    'location',
+                    'location_absolute',
+                    'dimensions',
+                    'parent',
+                    'color',
+            
+                    'texture_mapping',
+                    'color_mapping',
+            
+                    'node_tree'
+                    'outputs'
+                    }
+    convert_node_properties_to_xml(node, input_node_element, filter_for_input_node)
+
+    #3. Output Node: route output
+    convert_bpy_collection_to_xml(node.outputs, 'outputs', output_node_element, 0)
+
+    #4. Input Node: route inner output
+
+
+def convert_node_properties_to_xml(node, node_element, filter_unnecessary=None):
+
+        attribute_count = 0
+        for prop_name in node.bl_rna.properties.keys():
+            if filter_unnecessary != None and prop_name in filter_unnecessary:  # filter out unnecessary properties
+                continue
+            prop = getattr(node, prop_name)
+
+            # collection properties (inputs, outputs)
+            if isinstance(prop, bpy.types.bpy_prop_collection):
+                convert_bpy_collection_to_xml(prop, prop_name, node_element, attribute_count)
+
+            # standard type properties
+            elif isinstance(prop, (str, int, float, bool)):
+                ET.SubElement(node_element, "Constant", name=prop_name+str(attribute_count), value=str(prop))
+                attribute_count += 1
+
+            # mapping properties (TexMapping, ColorMapping)
+            #! Not Sure if these are even needed lol
+            # elif isinstance(prop, bpy.types.TexMapping) or isinstance(prop, bpy.types.ColorMapping):
+            #    convert_bpy_mapping_to_xml(prop, prop_name, node_element)
+
+            # vector properties (Vector)
+            elif isinstance(prop, mathutils.Vector):
+                convert_mathutils_vector_to_xml(prop, prop_name, node_element, attribute_count)
+
+            else:
+                print(f"Unsupported property type for {prop_name} in node {node.name}: {type(prop)}")
+
+def convert_mathutils_vector_to_xml(item, item_name, parent_element, attribute_count):
     try:
-        vector_element = ET.SubElement(parent_element, "Property", name=prop_name, type=type(prop).__name__)
-        for i, v in enumerate(prop):
-            ET.SubElement(vector_element, "Value", data=str(v))
+        item_element = ET.SubElement(parent_element, "Port", name="vectorIn"+str(attribute_count), direction="in", id=port_id_hash(parent_element.get("name"), item.as_pointer()))
+
+        extracted_vec_element = ET.SubElement(parent_element.getparent(), "Node", name=item.name, type=str(getattr(item, 'type', None)))
+        vec_value_counter = 0
+        for i in item.default_value:
+            ET.SubElement(extracted_vec_element, "Constant", name=item.name+str(vec_value_counter), value=str(i))
+        extracted_vec_element_outsocket = ET.SubElement(extracted_vec_element, "Port", name="vectorOut", direction="out", id=port_id_hash(parent_element.get("name"), f"{item.as_pointer()}vectorOut"))
+
+        connection_element = ET.SubElement(parent_element.getparent(), "Connection")
+        from_id = extracted_vec_element_outsocket.get("id")
+        to_id = item_element.get('id')
+        connection_element.set("from", from_id)
+        connection_element.set("to", to_id)
+
     except Exception as e:
-        print(f"{prop_name}: {type(prop)} | is not a mathutils.Vector")
+        print(f"{item_name}: {type(item)} | is not a mathutils.Vector")
         traceback.print_exc()
 
-def convert_mathutils_euler_to_xml(prop, prop_name, parent_element):
-    try:
-        euler_element = ET.SubElement(parent_element, "Property", name=prop_name, type=type(prop).__name__)
-        for i, v in enumerate(prop):
-            ET.SubElement(euler_element, "Value", data=str(v))
-        ET.SubElement(euler_element, "Value", data=str(prop.order))
-    except Exception as e:
-        print(f"{prop_name}: {type(prop)} | is not a mathutils.Euler")
-        traceback.print_exc()
+# def convert_mathutils_euler_to_xml(prop, prop_name, parent_element):
+#     try:
+#         euler_element = ET.SubElement(parent_element, "Property", name=prop_name, type=type(prop).__name__)
+#         for i, v in enumerate(prop):
+#             ET.SubElement(euler_element, "Value", data=str(v))
+#         ET.SubElement(euler_element, "Value", data=str(prop.order))
+#     except Exception as e:
+#         print(f"{prop_name}: {type(prop)} | is not a mathutils.Euler")
+#         traceback.print_exc()
 
-def convert_bpy_collection_to_xml(prop, prop_name, parent_element):
+def convert_bpy_collection_to_xml(prop, prop_name, parent_element, attribute_count):
     try:
         for item in prop:
             if item is None:
                 continue
 
             if item.is_linked:
-                item_element = ET.SubElement(parent_element, "Port", name=item.name, direction="out" if item.is_output else "in", id=port_id_hash(parent_element.get("name"), item.as_pointer()))
+                item_element = ET.SubElement(parent_element, "Port", name=item.name+str(attribute_count), direction="out" if item.is_output else "in", id=port_id_hash(parent_element.get("name"), item.as_pointer()))
             else:
                 if item.is_output:
                     continue  # Skip unlinked output items
                 
                 if hasattr(item, 'default_value'):
                     if isinstance(item.default_value, bpy.types.bpy_prop_array):
-                        item_element = ET.SubElement(parent_element, "Port", name="vectorIn", direction="in", id=port_id_hash(parent_element.get("name"), item.as_pointer()))
+                        item_element = ET.SubElement(parent_element, "Port", name="vectorIn"+str(attribute_count), direction="in", id=port_id_hash(parent_element.get("name"), item.as_pointer()))
                         extracted_vec_element = ET.SubElement(parent_element.getparent(), "Node", name=item.name, type=str(getattr(item, 'type', None)))
                         vec_coordinate_names = ['x', 'y', 'z']
                         for i in range(3):
                             ET.SubElement(extracted_vec_element, "Constant", name=vec_coordinate_names[i], value=str(item.default_value[i]))
                         extracted_vec_element_outsocket = ET.SubElement(extracted_vec_element, "Port", name="vectorOut", direction="out", id=port_id_hash(parent_element.get("name"), f"{item.as_pointer()}vectorOut"))
 
-                        ET.SubElement(parent_element.getparent(), "Connection", from_=extracted_vec_element_outsocket.get("id"), to=item_element.get("id"))
+                        connection_element = ET.SubElement(parent_element.getparent(), "Connection")
+                        from_id = extracted_vec_element_outsocket.get("id")
+                        to_id = item_element.get('id')
+                        connection_element.set("from", from_id)
+                        connection_element.set("to", to_id)
                     else:
-                        item_element = ET.SubElement(parent_element, "Constant", name=item.name, value=str(item.default_value))
+                        item_element = ET.SubElement(parent_element, "Constant", name=item.name+str(attribute_count), value=str(item.default_value))
+
+                    attribute_count += 1
 
     except Exception as e:
         print(f"{prop_name}: {type(prop)} | is not a bpy.types.bpy_prop_collection")
         traceback.print_exc()
 
 # TODO: ColorMapping has item ColorRamp, which is a collection (of ColorRampElements); needs special handling, not imlemented yet
-def convert_bpy_mapping_to_xml(prop, prop_name, parent_element):
-    texture_mapping_element = ET.SubElement(parent_element, "Constant", name=prop_name)
-    for item, item_value in prop.bl_rna.properties.items():
-        if item == 'rna_type':
-            continue
-        item_value = getattr(prop, item, None)
-        item_element = ET.SubElement(texture_mapping_element, "Item", name=str(item), type=type(item_value).__name__)
-        if isinstance(item_value, mathutils.Vector) or isinstance(item_value, mathutils.Euler) or isinstance(item_value, mathutils.Color):
-            for v in item_value:
-                ET.SubElement(item_element, "Value", data=str(v))
-            if isinstance(item_value, mathutils.Euler):
-                ET.SubElement(item_element, "Value", data=str(item_value.order))
+# def convert_bpy_mapping_to_xml(prop, prop_name, parent_element):
+#     texture_mapping_element = ET.SubElement(parent_element, "Constant", name=prop_name)
+#     for item, item_value in prop.bl_rna.properties.items():
+#         if item == 'rna_type':
+#             continue
+#         item_value = getattr(prop, item, None)
+#         item_element = ET.SubElement(texture_mapping_element, "Item", name=str(item), type=type(item_value).__name__)
+#         if isinstance(item_value, mathutils.Vector) or isinstance(item_value, mathutils.Euler) or isinstance(item_value, mathutils.Color):
+#             for v in item_value:
+#                 ET.SubElement(item_element, "Value", data=str(v))
+#             if isinstance(item_value, mathutils.Euler):
+#                 ET.SubElement(item_element, "Value", data=str(item_value.order))
                 
-        else:
-            item_element.set("value", str(item_value))
+#         else:
+#             item_element.set("value", str(item_value))
 
 
 ########################
