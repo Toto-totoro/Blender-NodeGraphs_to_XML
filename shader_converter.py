@@ -129,11 +129,11 @@ def convert_material_to_xml(material, root):
     # Format: <Link from_node="NodeA" from_socket="Output" to_node="NodeB" to_socket="Input"/>
     # Socket is the connection point (variable) from the graph
     
-    for link in nodegroup.links:
+    for link in material.node_tree.links:
         from_id = port_id_hash(link.from_node.name, link.from_socket.as_pointer())
         to_id = port_id_hash(link.to_node.name, link.to_socket.as_pointer())
         connection_element = ET.SubElement(
-            nodegroup_element,
+            material_element,
             "Connection"
         )
         connection_element.set("from", from_id)
