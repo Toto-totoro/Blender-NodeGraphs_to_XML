@@ -218,6 +218,9 @@ def convert_node_properties_to_xml(node, node_element, filter_unnecessary=None):
                 convert_mathutils_vector_to_xml(prop, prop_name, node_element, attribute_count)
                 attribute_count += 1
 
+            elif isinstance(prop, bpy.types.GeometryNodeTree) or isinstance(prop, bpy.types.ShaderNodeTree):
+                continue  # Skip node_tree properties, handled elsewhere
+
             else:
                 print(f"Unsupported property type for {prop_name} in node {node.name}: {type(prop)}")
 
