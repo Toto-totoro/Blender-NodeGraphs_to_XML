@@ -25,13 +25,15 @@ def convert_node_groups_to_xml(node_groups: list) -> str:
     # root element
     root = ET.Element("BlenderNodeGraphs")
 
+    graph_id = 0
     for node_group in node_groups:
-        convert_nodegroup_to_xml(node_group, root)
+        convert_nodegroup_to_xml(node_group, root, graph_id)
+        graph_id += 1
 
     return ET.tostring(root, pretty_print=True).decode()
 
-def convert_nodegroup_to_xml(nodegroup, root):
-    nodegroup_element = ET.SubElement(root, "Graph", name=nodegroup.name)
+def convert_nodegroup_to_xml(nodegroup, root, graph_id):
+    nodegroup_element = ET.SubElement(root, "Graph", name=nodegroup.name, id=str(graph_id))
 
     # TODO: check if output format is optimal for info retrieval
 
@@ -42,8 +44,9 @@ def convert_nodegroup_to_xml(nodegroup, root):
         is_nodegroup = node.bl_idname == "ShaderNodeGroup" or node.bl_idname == "GeometryNodeGroup"
         if is_nodegroup:
             if node.node_tree is not None:
-                convert_nodegroup_node_to_xml(node, nodegroup_element)
-                convert_nodegroup_to_xml(node.node_tree, nodegroup_element)
+                graph_id += 1
+                convert_nodegroup_to_xml(node.node_tree, nodegroup_element, graph_id)
+                convert_nodegroup_node_to_xml(node, nodegroup_element, graph_id)
             else:
                 print(f"Node group {node.name} has no node tree assigned.")
             
@@ -120,10 +123,16 @@ def convert_nodegroup_to_xml(nodegroup, root):
 # Conversion Helpers for different property types #
 ###################################################
 
-def convert_nodegroup_node_to_xml(node, parent_element):
+def convert_nodegroup_node_to_xml(node, parent_element, graph_id):
     #1. split nodegroup node in 2
-    input_node_element = ET.SubElement(parent_element, "Node", name=node.name+'in', type=node.bl_idname)
-    output_node_element = ET.SubElement(parent_element, "Node", name=node.name+'out', type=node.bl_idname)
+    wrapperIN_node_element = ET.SubElement(parent_element, "Node", name=node.name+'WrapperIn', type=node.bl_idname)
+    wrapperOUT_node_element = ET.SubElement(parent_element, "Node", name=node.name+'WrapperOut', type=node.bl_idname)
+
+    inner_input_node_element = parent_element.findall(f"Graph[@id='{graph_id}']")[0].findall(f"Node[@name='Group Input']")[0]
+    inner_output_node_element = parent_element.findall(f"Graph[@id='{graph_id}']")[0].findall(f"Node[@name='Group Output']")[0]
+
+    inner_input_node = node.node_tree.nodes.get('Group Input')
+    inner_output_node = node.node_tree.nodes.get('Group Output')
 
     #2. Input Node: route input
     filter_for_input_node = {
@@ -168,12 +177,18 @@ def convert_nodegroup_node_to_xml(node, parent_element):
                     'node_tree'
                     'outputs'
                     }
-    convert_node_properties_to_xml(node, input_node_element, filter_for_input_node)
+    convert_node_properties_to_xml(node, wrapperIN_node_element, filter_for_input_node)
 
     #3. Output Node: route output
-    convert_bpy_collection_to_xml(node.outputs, 'outputs', output_node_element, 0)
+    convert_bpy_collection_to_xml(node.outputs, 'outputs', wrapperOUT_node_element, 0)
 
-    #4. Input Node: route inner output
+    #4. Input Node: route outer to inner
+    connect_wrapperIN_to_innerOUT(wrapperIN_node_element, inner_input_node_element, node, inner_input_node)
+
+    #5. Output Node: route inner to outer
+    connect_innerOUT_to_wrapperIN(wrapperOUT_node_element, inner_output_node_element, node, inner_output_node)
+
+
 
 
 def convert_node_properties_to_xml(node, node_element, filter_unnecessary=None):
@@ -201,13 +216,15 @@ def convert_node_properties_to_xml(node, node_element, filter_unnecessary=None):
             # vector properties (Vector)
             elif isinstance(prop, mathutils.Vector):
                 convert_mathutils_vector_to_xml(prop, prop_name, node_element, attribute_count)
+                attribute_count += 1
 
             else:
                 print(f"Unsupported property type for {prop_name} in node {node.name}: {type(prop)}")
 
+
 def convert_mathutils_vector_to_xml(item, item_name, parent_element, attribute_count):
     try:
-        item_element = ET.SubElement(parent_element, "Port", name="vectorIn"+str(attribute_count), direction="in", id=port_id_hash(parent_element.get("name"), item.as_pointer()))
+        item_element = ET.SubElement(parent_element, "Port", name=item.name+str(attribute_count), direction="in", id=port_id_hash(parent_element.get("name"), item.as_pointer()))
 
         extracted_vec_element = ET.SubElement(parent_element.getparent(), "Node", name=item.name, type=str(getattr(item, 'type', None)))
         vec_value_counter = 0
@@ -249,7 +266,7 @@ def convert_bpy_collection_to_xml(prop, prop_name, parent_element, attribute_cou
                 
                 if hasattr(item, 'default_value'):
                     if isinstance(item.default_value, bpy.types.bpy_prop_array):
-                        item_element = ET.SubElement(parent_element, "Port", name="vectorIn"+str(attribute_count), direction="in", id=port_id_hash(parent_element.get("name"), item.as_pointer()))
+                        item_element = ET.SubElement(parent_element, "Port", name=item.name+str(attribute_count), direction="in", id=port_id_hash(parent_element.get("name"), item.as_pointer()))
                         extracted_vec_element = ET.SubElement(parent_element.getparent(), "Node", name=item.name, type=str(getattr(item, 'type', None)))
                         vec_coordinate_names = ['x', 'y', 'z']
                         for i in range(3):
@@ -264,7 +281,7 @@ def convert_bpy_collection_to_xml(prop, prop_name, parent_element, attribute_cou
                     else:
                         item_element = ET.SubElement(parent_element, "Constant", name=item.name+str(attribute_count), value=str(item.default_value))
 
-                    attribute_count += 1
+            attribute_count += 1
 
     except Exception as e:
         print(f"{prop_name}: {type(prop)} | is not a bpy.types.bpy_prop_collection")
@@ -294,3 +311,34 @@ def convert_bpy_collection_to_xml(prop, prop_name, parent_element, attribute_cou
 
 def port_id_hash(parent_name, item_pointer):
     return hashlib.sha1(f'{parent_name}{item_pointer}'.encode()).hexdigest()
+
+def connect_wrapperIN_to_innerOUT(wrapper_node_element, inner_input_node_element, wrapper_node, inner_node):
+    attribute_count = 0
+    for output_socket in inner_node.outputs:
+            if output_socket.name == "":  # there is always an unnamed placeholder socket, skip that b*
+                continue
+            outer_id = port_id_hash(wrapper_node.get("name"), f"{output_socket.as_pointer()}_WrapperIn-Output")
+            inner_id = port_id_hash(inner_node.get("name"), f"{output_socket.as_pointer()}_InnerIn-Input")
+            ET.SubElement(wrapper_node_element, "Port", name=output_socket.name+str(attribute_count), direction="out", id=outer_id)
+            ET.SubElement(inner_input_node_element, "Port", name=output_socket.name+str(attribute_count), direction="in", id=inner_id)
+            connection_element = ET.SubElement(wrapper_node_element.getparent(), "Connection")
+            connection_element.set("from", outer_id)
+            connection_element.set("to", inner_id)
+
+            attribute_count += 1
+
+
+def connect_innerOUT_to_wrapperIN(wrapper_node_element, inner_output_node_element, wrapper_node, inner_node):
+    attribute_count = 0
+    for input_socket in inner_node.inputs:
+            if input_socket.name == "":  # there is always an unnamed placeholder socket, skip that b*
+                continue
+            outer_id = port_id_hash(wrapper_node.get("name"), f"{input_socket.as_pointer()}_WrapperOUT-Input")
+            inner_id = port_id_hash(inner_node.get("name"), f"{input_socket.as_pointer()}_InnerOUT-Output")
+            ET.SubElement(inner_output_node_element, "Port", name=input_socket.name+str(attribute_count), direction="out", id=inner_id)
+            ET.SubElement(wrapper_node_element, "Port", name=input_socket.name+str(attribute_count), direction="in", id=outer_id)
+            connection_element = ET.SubElement(wrapper_node_element.getparent(), "Connection")
+            connection_element.set("from", inner_id)
+            connection_element.set("to", outer_id)
+
+            attribute_count += 1
