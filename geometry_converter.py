@@ -27,7 +27,7 @@ def convert_node_groups_to_xml(node_groups: list) -> str:
 
     graph_id = 0
     for node_group in node_groups:
-        convert_nodegroup_to_xml(node_group, root, graph_id)
+        graph_id = convert_nodegroup_to_xml(node_group, root, graph_id)
         graph_id += 1
 
     return ET.tostring(root, pretty_print=True).decode()
@@ -47,6 +47,7 @@ def convert_nodegroup_to_xml(nodegroup, root, graph_id):
                 graph_id += 1
                 convert_nodegroup_to_xml(node.node_tree, nodegroup_element, graph_id)
                 convert_nodegroup_node_to_xml(node, nodegroup_element, graph_id)
+                continue  # Skip the rest for node groups
             else:
                 print(f"Node group {node.name} has no node tree assigned.")
             
@@ -117,6 +118,8 @@ def convert_nodegroup_to_xml(nodegroup, root, graph_id):
         connection_element.set("from", from_id)
         connection_element.set("to", to_id)
 
+    return graph_id
+
 
 
 ###################################################
@@ -182,11 +185,11 @@ def convert_nodegroup_node_to_xml(node, parent_element, graph_id):
     #3. Output Node: route output
     convert_bpy_collection_to_xml(node.outputs, 'outputs', wrapperOUT_node_element, 0)
 
-    #4. Input Node: route outer to inner
-    connect_wrapperIN_to_innerOUT(wrapperIN_node_element, inner_input_node_element, node, inner_input_node)
-
-    #5. Output Node: route inner to outer
-    connect_innerOUT_to_wrapperIN(wrapperOUT_node_element, inner_output_node_element, node, inner_output_node)
+    attribute_count = 0
+        #4. Input Node: route outer to inner
+    attribute_count = connect_wrapperIN_to_innerOUT(wrapperIN_node_element, inner_input_node_element, node, inner_input_node, attribute_count)
+        #5. Output Node: route inner to outer
+    attribute_count = connect_innerOUT_to_wrapperIN(wrapperOUT_node_element, inner_output_node_element, node, inner_output_node, attribute_count)
 
 
 
@@ -201,7 +204,7 @@ def convert_node_properties_to_xml(node, node_element, filter_unnecessary=None):
 
             # collection properties (inputs, outputs)
             if isinstance(prop, bpy.types.bpy_prop_collection):
-                convert_bpy_collection_to_xml(prop, prop_name, node_element, attribute_count)
+                attribute_count = convert_bpy_collection_to_xml(prop, prop_name, node_element, attribute_count)
 
             # standard type properties
             elif isinstance(prop, (str, int, float, bool)):
@@ -290,6 +293,8 @@ def convert_bpy_collection_to_xml(prop, prop_name, parent_element, attribute_cou
         print(f"{prop_name}: {type(prop)} | is not a bpy.types.bpy_prop_collection")
         traceback.print_exc()
 
+    return attribute_count
+
 # TODO: ColorMapping has item ColorRamp, which is a collection (of ColorRampElements); needs special handling, not imlemented yet
 # def convert_bpy_mapping_to_xml(prop, prop_name, parent_element):
 #     texture_mapping_element = ET.SubElement(parent_element, "Constant", name=prop_name)
@@ -315,8 +320,7 @@ def convert_bpy_collection_to_xml(prop, prop_name, parent_element, attribute_cou
 def port_id_hash(parent_name, item_pointer):
     return hashlib.sha1(f'{parent_name}{item_pointer}'.encode()).hexdigest()
 
-def connect_wrapperIN_to_innerOUT(wrapper_node_element, inner_input_node_element, wrapper_node, inner_node):
-    attribute_count = 0
+def connect_wrapperIN_to_innerOUT(wrapper_node_element, inner_input_node_element, wrapper_node, inner_node, attribute_count):
     for output_socket in inner_node.outputs:
             if output_socket.name == "":  # there is always an unnamed placeholder socket, skip that b*
                 continue
@@ -329,10 +333,10 @@ def connect_wrapperIN_to_innerOUT(wrapper_node_element, inner_input_node_element
             connection_element.set("to", inner_id)
 
             attribute_count += 1
+    return attribute_count
 
 
-def connect_innerOUT_to_wrapperIN(wrapper_node_element, inner_output_node_element, wrapper_node, inner_node):
-    attribute_count = 0
+def connect_innerOUT_to_wrapperIN(wrapper_node_element, inner_output_node_element, wrapper_node, inner_node, attribute_count):
     for input_socket in inner_node.inputs:
             if input_socket.name == "":  # there is always an unnamed placeholder socket, skip that b*
                 continue
@@ -345,3 +349,5 @@ def connect_innerOUT_to_wrapperIN(wrapper_node_element, inner_output_node_elemen
             connection_element.set("to", outer_id)
 
             attribute_count += 1
+
+    return attribute_count
