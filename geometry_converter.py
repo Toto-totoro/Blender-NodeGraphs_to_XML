@@ -185,11 +185,11 @@ def convert_nodegroup_node_to_xml(node, parent_element, graph_id):
     #3. Output Node: route output
     convert_bpy_collection_to_xml(node.outputs, 'outputs', wrapperOUT_node_element, 0)
 
-    attribute_count = 0
-        #4. Input Node: route outer to inner
-    attribute_count = connect_wrapperIN_to_innerOUT(wrapperIN_node_element, inner_input_node_element, node, inner_input_node, attribute_count)
-        #5. Output Node: route inner to outer
-    attribute_count = connect_innerOUT_to_wrapperIN(wrapperOUT_node_element, inner_output_node_element, node, inner_output_node, attribute_count)
+    #4. Input Node: route outer to inner
+    connect_wrapperIN_to_innerOUT(wrapperIN_node_element, inner_input_node_element, node, inner_input_node)
+
+    #5. Output Node: route inner to outer
+    connect_innerOUT_to_wrapperIN(wrapperOUT_node_element, inner_output_node_element, node, inner_output_node)
 
 
 
@@ -320,7 +320,8 @@ def convert_bpy_collection_to_xml(prop, prop_name, parent_element, attribute_cou
 def port_id_hash(parent_name, item_pointer):
     return hashlib.sha1(f'{parent_name}{item_pointer}'.encode()).hexdigest()
 
-def connect_wrapperIN_to_innerOUT(wrapper_node_element, inner_input_node_element, wrapper_node, inner_node, attribute_count):
+def connect_wrapperIN_to_innerOUT(wrapper_node_element, inner_input_node_element, wrapper_node, inner_node):
+    attribute_count = len(inner_node.outputs) + 2
     for output_socket in inner_node.outputs:
             if output_socket.name == "":  # there is always an unnamed placeholder socket, skip that b*
                 continue
@@ -333,10 +334,10 @@ def connect_wrapperIN_to_innerOUT(wrapper_node_element, inner_input_node_element
             connection_element.set("to", inner_id)
 
             attribute_count += 1
-    return attribute_count
 
 
-def connect_innerOUT_to_wrapperIN(wrapper_node_element, inner_output_node_element, wrapper_node, inner_node, attribute_count):
+def connect_innerOUT_to_wrapperIN(wrapper_node_element, inner_output_node_element, wrapper_node, inner_node):
+    attribute_count = len(inner_node.inputs) + 2
     for input_socket in inner_node.inputs:
             if input_socket.name == "":  # there is always an unnamed placeholder socket, skip that b*
                 continue
@@ -349,5 +350,3 @@ def connect_innerOUT_to_wrapperIN(wrapper_node_element, inner_output_node_elemen
             connection_element.set("to", outer_id)
 
             attribute_count += 1
-
-    return attribute_count
